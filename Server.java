@@ -1,14 +1,21 @@
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.*;
 import java.util.*;
+import java.nio.file.*;
 
 public class Server {
-    static List<ConnectionHandler> connectedUsers = new ArrayList<>();
+    private static List<ConnectionHandler> connectedUsers = new ArrayList<>();
+    private static List<String> messages = new ArrayList<>();
+
+    private static Lock lock = new ReentrantLock();
+    private static BufferedWriter logOuputStream;
     
     static class ConnectionHandler implements Runnable{
 
@@ -30,25 +37,37 @@ public class Server {
                     String name = this.in.readLine();
                     if(name != null){
                         this.username = name;
-                        String formattedMessage = "User " + username + " has joined the chat!";
-                        System.out.println(formattedMessage);
-                        broadcastMessage(formattedMessage, this);
+                        broadcastMessage("User " + username + " has joined the chat!", this);
                         break;
                     }
+                }
+
+                // send all sent messages in chat
+                for(String message : messages){
+                    this.out.println(message);
                 }
 
                 while(true){
                     String message = this.in.readLine();
                     if(message != null){
-                        String formattedMessage = username+": " + message;
-                        System.out.println(formattedMessage);
-                        broadcastMessage(formattedMessage, this);
+                        broadcastMessage(username+": " + message, this);
                     }
                 }
             } catch(Exception e){
-                String formattedMessage = username + " has disconnected";
-                System.out.println(formattedMessage);
-                broadcastMessage(formattedMessage, null);
+                try{
+                    broadcastMessage(username + " has disconnected", null);
+                } catch(IOException IOe){
+                    System.out.println("Failed to send disconnect message");
+                    IOe.printStackTrace();
+                }
+            } finally {
+                try{
+                    this.in.close();
+                } catch(IOException e){
+                    System.out.println("Failed to close input stream");
+                    e.printStackTrace();
+                }
+                this.out.close();
             }
         }
 
@@ -57,17 +76,31 @@ public class Server {
         }
     }
 
-    static void broadcastMessage(String message, ConnectionHandler sender){
-        for(var user : connectedUsers){
-            if(!user.equals(sender)){
-                user.sendMessage(message);
+    static void broadcastMessage(String message, ConnectionHandler sender) throws IOException{
+        lock.lock();
+        messages.add(message);
+        logOuputStream.write(message+'\n');
+        logOuputStream.flush();
+        System.out.println(message);
+        try{
+            for(var user : connectedUsers){
+                if(user!= null && !user.equals(sender)){
+                    user.sendMessage(message);
+                }
             }
+        } finally {
+            lock.unlock();
         }
     }
 
     public static void main(String args[]){
         ExecutorService executor = null; // TODO: fix to always shutdown properly
         try{
+            Path chatLogFile = Paths.get(".").resolve("chatLog.txt");
+            Files.deleteIfExists(chatLogFile);
+
+            logOuputStream = Files.newBufferedWriter(chatLogFile);
+
             executor = Executors.newCachedThreadPool();
             try(ServerSocket ss = new ServerSocket(5050)){
                 while(true){
@@ -81,6 +114,8 @@ public class Server {
             } catch(Exception e){
                 e.printStackTrace();
             }
+        } catch(IOException e){
+
         } finally{
             executor.shutdown();
         }
