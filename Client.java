@@ -2,14 +2,12 @@ import java.io.PrintWriter;
 import java.net.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
 public class Client {
-
     static class ConnectionHandler implements Runnable{
 
         private final BufferedReader in;
@@ -57,10 +55,11 @@ public class Client {
                     }
                 }
             } catch(Exception e){
-                e.printStackTrace();
+                System.out.println("The server was closed");
             }
         } finally {
             executor.shutdown();
+            System.exit(0);
         }
     }
 }

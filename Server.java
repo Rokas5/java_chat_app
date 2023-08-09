@@ -9,6 +9,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.locks.*;
 import java.util.*;
 import java.nio.file.*;
+import java.time.*;
+import java.time.format.*;
 
 public class Server {
     private static List<ConnectionHandler> connectedUsers = new ArrayList<>();
@@ -78,11 +80,11 @@ public class Server {
 
     static void broadcastMessage(String message, ConnectionHandler sender) throws IOException{
         lock.lock();
-        messages.add(message);
-        logOuputStream.write(message+'\n');
-        logOuputStream.flush();
-        System.out.println(message);
         try{
+            messages.add(message);
+            logOuputStream.write(message+'\n');
+            logOuputStream.flush();
+            System.out.println(message);
             for(var user : connectedUsers){
                 if(user!= null && !user.equals(sender)){
                     user.sendMessage(message);
@@ -96,7 +98,11 @@ public class Server {
     public static void main(String args[]){
         ExecutorService executor = null; // TODO: fix to always shutdown properly
         try{
-            Path chatLogFile = Paths.get(".").resolve("chatLog.txt");
+            Path logsFolder = Paths.get(".").resolve("logs");
+            Files.createDirectories(logsFolder);
+
+            String currenDate = DateTimeFormatter.ofPattern("YYYY-MM-dd'_'hh.mm.ss").format(LocalDateTime.now());
+            Path chatLogFile = logsFolder.resolve("chatLog-"+ currenDate +".txt");
             Files.deleteIfExists(chatLogFile);
 
             logOuputStream = Files.newBufferedWriter(chatLogFile);
@@ -115,9 +121,11 @@ public class Server {
                 e.printStackTrace();
             }
         } catch(IOException e){
-
+            System.out.println("Failed to create a chat log file");
         } finally{
-            executor.shutdown();
+            if(executor != null){
+                executor.shutdown();
+            }
         }
     }
 }
