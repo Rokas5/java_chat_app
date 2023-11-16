@@ -109,6 +109,7 @@ public class Server {
 
             executor = Executors.newCachedThreadPool();
             try(ServerSocket ss = new ServerSocket(5050)){
+                System.out.println("Server has started...");
                 while(true){
                         Socket s = ss.accept();
                         if(s != null){
